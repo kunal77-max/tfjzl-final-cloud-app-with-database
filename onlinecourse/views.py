@@ -153,6 +153,7 @@ def submit(request, course_id):
     )
 
 
+
 def show_exam_result(request, course_id, submission_id):
     course = get_object_or_404(Course, pk=course_id)
 
@@ -175,24 +176,19 @@ def show_exam_result(request, course_id, submission_id):
         submission.choices.values_list('id', flat=True)
     )
 
+    questions = course.question_set.all()
     question_results = []
-    score = 0
     total_grade = 0
+    score = 0
 
-    for question in course.question_set.all():
+    for question in questions:
         choices = question.choice_set.all()
-        correct_ids = set(
-            choices.filter(is_correct=True).values_list('id', flat=True)
-        )
-        question_selected_ids = selected_ids.intersection(
-            set(choices.values_list('id', flat=True))
+        question_selected_ids = set(
+            choices.filter(id__in=selected_ids)
+            .values_list('id', flat=True)
         )
 
-        is_correct = (
-            bool(correct_ids)
-            and question_selected_ids == correct_ids
-        )
-
+        is_correct = question.is_get_score(selected_ids)
         total_grade += question.grade
 
         if is_correct:
@@ -206,16 +202,19 @@ def show_exam_result(request, course_id, submission_id):
         })
 
     percentage = (score / total_grade * 100) if total_grade else 0
-    passed = percentage >= 50
 
     context = {
         'course': course,
         'submission': submission,
+        'questions': questions,
+        'choices': submission.choices.all(),
         'question_results': question_results,
+        'grade': percentage,
+        'possible': total_grade,
         'score': score,
         'total_grade': total_grade,
         'percentage': percentage,
-        'passed': passed,
+        'passed': percentage >= 80,
     }
 
     return render(
@@ -223,6 +222,7 @@ def show_exam_result(request, course_id, submission_id):
         'onlinecourse/exam_result_bootstrap.html',
         context
     )
+
 
 
 
